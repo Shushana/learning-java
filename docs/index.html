@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Le Juge</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Le Juge">
+  <meta name="theme-color" content="#1b1530">
+  <link rel="apple-touch-icon" href="icon-180.png">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>🥁 Le Juge</h1>
+    <div id="scorebar"></div>
+    <button id="btn-settings" class="icon" aria-label="Réglages">⚙️</button>
+  </header>
+
+  <main>
+    <!-- Lobby -->
+    <section id="screen-lobby" class="screen">
+      <div class="card intro">
+        <p><b>Bienvenue !</b> Le Juge pose une question. Toi et les bots répondez en français. Le Juge note l'idée et le français.</p>
+        <p class="hint">The judge asks a question. You and the bots answer in French. The judge scores your idea and your French. Chat with the bots below before you start.</p>
+        <label class="row">Manches <select id="rounds-count"><option>3</option><option selected>5</option><option>8</option></select></label>
+        <button id="btn-play" class="primary big">▶ Jouer</button>
+      </div>
+    </section>
+
+    <!-- Round -->
+    <section id="screen-round" class="screen" hidden>
+      <div class="card judge">
+        <div class="judge-head"><span class="drum">🥁</span><span id="round-label">Manche 1</span><span id="round-kind" class="tag"></span></div>
+        <p id="scenario" class="scenario">…</p>
+        <p id="scenario-en" class="hint" hidden></p>
+        <div class="row wrap">
+          <button id="btn-repeat">🔊 Répéter</button>
+          <button id="btn-slow">🐢 Lentement</button>
+          <button id="btn-en">🇬🇧 English</button>
+        </div>
+        <div id="useful-words" class="words"></div>
+      </div>
+      <div class="timer"><div id="timer-bar"></div></div>
+      <div id="players" class="players"></div>
+      <div class="card">
+        <textarea id="answer" rows="4" placeholder="Écris ou dis ta réponse en français…" autocomplete="off" autocapitalize="sentences" spellcheck="false"></textarea>
+        <div class="row">
+          <button id="btn-mic" class="mic">🎤 Parler</button>
+          <button id="btn-submit" class="primary">Envoyer ✓</button>
+        </div>
+        <p id="mic-note" class="hint" hidden></p>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section id="screen-results" class="screen" hidden>
+      <div class="card judge">
+        <div class="judge-head"><span class="drum">🥁</span><b>Verdict</b></div>
+        <p id="verdict" class="scenario"></p>
+        <div id="results-table"></div>
+      </div>
+      <div class="card feedback">
+        <h2>Ta réponse</h2>
+        <p class="yours" id="your-answer"></p>
+        <h3>✅ Correction</h3>
+        <p id="corrected" class="good"></p>
+        <ul id="mistakes"></ul>
+        <h3>🇫🇷 Comme un natif</h3>
+        <p id="better" class="good"></p>
+        <div class="row wrap">
+          <button id="btn-hear-better">🔊 Écouter</button>
+          <button id="btn-drill" class="mic">🎤 Répète après moi</button>
+        </div>
+        <p id="drill-result" class="hint"></p>
+        <p id="tip" class="tip"></p>
+        <div id="new-words" class="words"></div>
+      </div>
+      <button id="btn-next" class="primary big">Manche suivante ▶</button>
+    </section>
+
+    <!-- Final -->
+    <section id="screen-final" class="screen" hidden>
+      <div class="card judge">
+        <div class="judge-head"><span class="drum">🥁</span><b>Fin de la partie !</b></div>
+        <p id="final-verdict" class="scenario"></p>
+        <div id="final-table"></div>
+      </div>
+      <button id="btn-again" class="primary big">↻ Rejouer</button>
+    </section>
+
+    <!-- Chat (shown in lobby and results) -->
+    <section id="chat" class="card chat">
+      <h2>💬 Chat</h2>
+      <div id="chat-log"></div>
+      <div class="row">
+        <button id="btn-chat-mic" class="icon mic" aria-label="Parler">🎤</button>
+        <input id="chat-input" placeholder="Dis quelque chose aux bots…" autocomplete="off">
+        <button id="btn-chat-send" class="primary">➤</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Settings -->
+  <dialog id="settings">
+    <form method="dialog">
+      <h2>⚙️ Réglages</h2>
+      <label>Clé API Anthropic
+        <input id="set-key" type="password" placeholder="sk-ant-…" autocomplete="off">
+      </label>
+      <p class="hint">Stored only on this phone. Get one at console.anthropic.com → API Keys.</p>
+      <label>Modèle
+        <select id="set-model">
+          <option value="claude-opus-5-5">Claude Opus 5.5 (best judge)</option>
+          <option value="claude-haiku-5-5">Claude Haiku 5.5 (faster, ~40× cheaper)</option>
+        </select>
+      </label>
+      <label>Niveau
+        <select id="set-level"><option value="A1">A1</option><option value="A2">A2</option></select>
+      </label>
+      <label>Minuteur
+        <select id="set-timer"><option value="30">30 s</option><option value="60">60 s</option><option value="90">90 s</option><option value="0">Off</option></select>
+      </label>
+      <label>Vitesse de la voix
+        <select id="set-rate"><option value="0.7">Lente</option><option value="0.85">Normale (A1–A2)</option><option value="1">Rapide</option></select>
+      </label>
+      <label class="row"><input id="set-botvoice" type="checkbox"> Les bots parlent à voix haute</label>
+      <label class="row"><input id="set-autoen" type="checkbox"> Toujours montrer l'anglais</label>
+      <div class="row"><button value="ok" class="primary">OK</button></div>
+    </form>
+  </dialog>
+
+  <div id="toast" hidden></div>
+  <script type="module" src="app.js"></script>
+</body>
+</html>
