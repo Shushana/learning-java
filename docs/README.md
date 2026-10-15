@@ -37,3 +37,7 @@ Cost: each round is 2 API calls (question, verdict), plus 1 per chat message.
 - `speech.js`: French text-to-speech and speech recognition
 - `vendor/anthropic-sdk.js`: bundled `@anthropic-ai/sdk` 0.130.0. To rebuild:
   `echo 'export { default as Anthropic } from "@anthropic-ai/sdk";' > entry.js && npx esbuild entry.js --bundle --format=esm --minify --target=safari15 --outfile=docs/vendor/anthropic-sdk.js`
+
+## Claude subscription version (no API key)
+
+`le-juge-artifact.html` is the same game, built as a claude.ai Artifact. Claude runs on the player's own claude.ai plan through the artifact `sample` capability, so you don't need an API key. Artifacts can't use the microphone, so you speak through the iPhone keyboard's dictation key. The published copy is at https://claude.ai/artifact/6ttgpDJ6t4PbnsvcLFL71c

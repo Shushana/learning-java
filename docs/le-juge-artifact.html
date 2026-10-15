@@ -1,0 +1,667 @@
+<title>Le Juge</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bagel+Fat+One&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&display=swap">
+<style>
+/* Layout: one narrow game-show column. The judge's podium card on top, then play, then the chat backstage. Deliberately dark: a stage under lights. */
+:root {
+  --stage: #12142b;       /* the dark studio */
+  --podium: #1d2145;      /* raised surfaces */
+  --podium-2: #2a2f5e;    /* controls on a podium */
+  --ink: #f3f1ea;         /* main text */
+  --dim: #a9acc9;         /* secondary text */
+  --brass: #f2b33d;       /* the judge's accent: brass drum rims, buttons */
+  --brass-ink: #2b1d00;
+  --bleu: #4b7bec;        /* tricolore blue: you */
+  --rouge: #ef5b5b;       /* tricolore red: mistakes, time */
+  --vert: #5fd39a;        /* corrections */
+  --f-display: "Bagel Fat One", "Arial Rounded MT Bold", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { background: var(--stage); color: var(--ink); }
+body {
+  font: 17px/1.5 var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: 0 32px;
+  -webkit-text-size-adjust: 100%;
+}
+.wrap { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+header.wrap {
+  flex-direction: row;
+  position: sticky; top: env(safe-area-inset-top, 0px); z-index: 5;
+  background: var(--stage);
+  display: flex; align-items: center; gap: 10px; padding-block: 10px;
+  border-bottom: 1px solid var(--podium-2);
+}
+.logo { font: 26px/1 var(--f-display); color: var(--brass); letter-spacing: 0.5px; white-space: nowrap; }
+#scorebar { flex: 1; min-width: 0; display: flex; gap: 6px; overflow-x: auto; font-variant-numeric: tabular-nums; }
+.chip { display: inline-flex; align-items: center; gap: 6px; background: var(--podium); border-radius: 99px; padding: 3px 10px 3px 3px; font-size: 14px; white-space: nowrap; }
+.av { width: 22px; height: 22px; border-radius: 50%; display: inline-grid; place-items: center; font: 700 12px/1 var(--f-body); color: #111; flex: none; }
+h2 { font: 22px/1.2 var(--f-display); margin: 0; color: var(--brass); text-wrap: balance; letter-spacing: 0.3px; }
+h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); margin: 10px 0 2px; }
+p { margin: 0; }
+.dim { color: var(--dim); font-size: 15px; }
+.panel { background: var(--podium); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.podium { background: var(--podium); border: 2px solid var(--brass); border-radius: 18px; padding: 16px; display: flex; flex-direction: column; gap: 10px; }
+.judge-row { display: flex; align-items: center; gap: 10px; }
+.judge-row .meta { flex: 1; color: var(--dim); font-size: 14px; }
+.tag { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; background: var(--podium-2); padding: 3px 9px; border-radius: 99px; color: var(--ink); }
+.drum { width: 46px; height: 46px; flex: none; }
+.drum.talking { animation: beat 0.35s infinite alternate ease-in-out; }
+@keyframes beat { to { transform: translateY(-3px) rotate(-5deg); } }
+.scenario { font-size: 22px; line-height: 1.35; font-weight: 700; text-wrap: balance; }
+.row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+button {
+  font: inherit; font-size: 16px; color: var(--ink); background: var(--podium-2);
+  border: 0; border-radius: 12px; padding: 10px 14px; cursor: pointer; min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
+}
+button:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid var(--bleu); outline-offset: 2px; }
+button:active { transform: scale(0.97); }
+button:disabled { opacity: 0.5; cursor: default; }
+button.go { background: var(--brass); color: var(--brass-ink); font-weight: 700; }
+button.big { width: 100%; font: 22px/1 var(--f-display); padding: 16px; letter-spacing: 0.5px; }
+.push { margin-left: auto; }
+input, select, textarea {
+  font: inherit; font-size: 17px; color: var(--ink); background: var(--stage);
+  border: 1px solid var(--podium-2); border-radius: 12px; padding: 12px; width: 100%;
+}
+textarea { resize: vertical; min-height: 110px; }
+.mic-hint { display: flex; gap: 10px; align-items: flex-start; font-size: 14px; color: var(--dim); }
+.mic-hint b { color: var(--ink); }
+.key { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 6px; background: var(--podium-2); color: var(--ink); flex: none; }
+.words { display: flex; flex-wrap: wrap; gap: 6px; }
+.words span { background: var(--stage); border-radius: 8px; padding: 4px 9px; font-size: 14px; }
+.words b { color: var(--brass); }
+.timer { height: 8px; background: var(--podium); border-radius: 99px; overflow: hidden; }
+#timer-bar { height: 100%; width: 100%; background: var(--brass); transition: width 0.5s linear; }
+#timer-bar.low { background: var(--rouge); }
+.players { display: flex; flex-wrap: wrap; gap: 6px; }
+.result { background: var(--stage); border-radius: 14px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.result.win { box-shadow: inset 0 0 0 2px var(--brass); }
+.result .who { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.result .pts { margin-left: auto; color: var(--brass); font-variant-numeric: tabular-nums; }
+.result .com { color: var(--dim); font-size: 14px; font-style: italic; }
+.crown { font: 12px/1 var(--f-body); text-transform: uppercase; letter-spacing: 1px; color: var(--brass-ink); background: var(--brass); padding: 3px 7px; border-radius: 6px; }
+.yours { color: var(--dim); }
+.good { color: var(--vert); font-weight: 700; font-size: 19px; }
+#mistakes { margin: 0; padding-left: 20px; font-size: 15px; display: flex; flex-direction: column; gap: 4px; }
+#mistakes s { color: var(--rouge); }
+#mistakes b { color: var(--vert); }
+.tip { border-left: 3px solid var(--bleu); padding: 6px 10px; background: var(--stage); border-radius: 0 8px 8px 0; font-size: 15px; }
+#chat-log { max-height: 46vh; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; padding-right: 2px; }
+.msg { display: flex; gap: 8px; align-items: flex-end; max-width: 88%; min-width: 0; }
+.msg .bubble { background: var(--podium-2); border-radius: 14px 14px 14px 4px; padding: 8px 12px; min-width: 0; overflow-wrap: anywhere; }
+.msg .from { display: block; font-size: 12px; color: var(--dim); }
+.msg.me { align-self: flex-end; }
+.msg.me .bubble { background: var(--bleu); color: #fff; border-radius: 14px 14px 4px 14px; }
+.msg.sys { align-self: center; max-width: 100%; color: var(--dim); font-size: 13px; text-align: center; }
+.chat-in { display: flex; gap: 8px; }
+.chat-in input { flex: 1; min-width: 0; }
+label.field { display: flex; flex-direction: column; gap: 4px; font-size: 14px; color: var(--dim); }
+label.check { display: flex; gap: 10px; align-items: center; font-size: 16px; }
+label.check input { width: 22px; height: 22px; flex: none; }
+.grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+@media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } }
+#toast {
+  position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 10;
+  background: var(--rouge); color: #2a0000; padding: 12px 14px; border-radius: 12px; font-weight: 700;
+}
+.thinking::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
+@keyframes dots { 0% { content: ""; } 25% { content: "."; } 50% { content: ".."; } 75% { content: "..."; } }
+.rules { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 15px; }
+.example { background: var(--stage); border-radius: 12px; padding: 10px 12px; font-size: 15px; display: flex; flex-direction: column; gap: 2px; }
+.example .lbl { font-size: 12px; text-transform: uppercase; letter-spacing: 1px; color: var(--dim); }
+@media (prefers-reduced-motion: reduce) { .drum.talking, .thinking::after { animation: none; } #timer-bar { transition: none; } }
+</style>
+
+<header class="wrap">
+  <span class="logo">Le Juge</span>
+  <div id="scorebar" aria-label="Scores"></div>
+  <button id="btn-settings" aria-label="Réglages">Réglages</button>
+</header>
+
+<div class="wrap" style="padding-top:14px">
+
+  <!-- Settings -->
+  <section id="screen-settings" class="panel" hidden>
+    <h2>Réglages</h2>
+    <div class="grid2">
+      <label class="field">Niveau
+        <select id="set-level"><option value="A1">A1, débutant</option><option value="A2">A2, élémentaire</option></select>
+      </label>
+      <label class="field">Minuteur
+        <select id="set-timer"><option value="30">30 s</option><option value="60">60 s</option><option value="90">90 s</option><option value="0">Sans</option></select>
+      </label>
+      <label class="field">Vitesse de la voix
+        <select id="set-rate"><option value="0.7">Lente</option><option value="0.85">Normale</option><option value="1">Rapide</option></select>
+      </label>
+      <label class="field">Le juge
+        <select id="set-tier"><option value="quick">Rapide</option><option value="default">Normal</option><option value="complex">Expert (plus lent)</option></select>
+      </label>
+    </div>
+    <label class="check"><input id="set-botvoice" type="checkbox"> Les bots parlent à voix haute</label>
+    <label class="check"><input id="set-autoen" type="checkbox"> Toujours montrer l'anglais</label>
+    <p class="dim">Every question, verdict and chat reply uses your Claude plan's usage. The first time, Claude asks you to allow this page.</p>
+    <button id="btn-settings-ok" class="go">OK</button>
+  </section>
+
+  <!-- Lobby -->
+  <section id="screen-lobby" class="podium">
+    <div class="judge-row">
+      <svg class="drum" viewBox="0 0 48 48" aria-hidden="true"><line x1="6" y1="3" x2="20" y2="16" stroke="var(--brass)" stroke-width="3" stroke-linecap="round"/><line x1="42" y1="3" x2="28" y2="16" stroke="var(--brass)" stroke-width="3" stroke-linecap="round"/><rect x="8" y="20" width="32" height="22" rx="5" fill="var(--rouge)"/><ellipse cx="24" cy="20" rx="16" ry="5" fill="var(--ink)" stroke="var(--brass)" stroke-width="2"/><path d="M12 25 L17 40 M22 25 L27 40 M32 25 L37 40" stroke="var(--brass)" stroke-width="2"/><circle cx="19" cy="31" r="2.5" fill="var(--stage)"/><circle cx="29" cy="31" r="2.5" fill="var(--stage)"/></svg>
+      <div class="meta">Le Juge, a sentient drum, presents…</div>
+    </div>
+    <h2>Réponds en français. Le Juge décide.</h2>
+    <ol class="rules">
+      <li>The judge reads a situation out loud: sometimes absurd, sometimes real life in France.</li>
+      <li>You and three bots answer in French before the timer runs out.</li>
+      <li>Each answer gets up to 5 points for the idea and 5 for the French. You get your sentence corrected.</li>
+    </ol>
+    <div class="example">
+      <span class="lbl">Exemple de manche</span>
+      <span><b>Le Juge :</b> Un dragon attaque ta boulangerie. Que fais-tu ?</span>
+      <span><b>Toi :</b> Je donne un croissant au dragon et on devient amis.</span>
+    </div>
+    <div class="row">
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px">Manches
+        <select id="rounds-count" style="width:auto"><option>3</option><option selected>5</option><option>8</option></select>
+      </label>
+    </div>
+    <button id="btn-play" class="go big">Jouer</button>
+    <p id="unavailable" class="dim" hidden>Claude isn't available in this view. Open this page on claude.ai while signed in to play.</p>
+  </section>
+
+  <!-- Round -->
+  <section id="screen-round" hidden>
+    <div class="podium">
+      <div class="judge-row">
+        <svg class="drum" viewBox="0 0 48 48" aria-hidden="true"><line x1="6" y1="3" x2="20" y2="16" stroke="var(--brass)" stroke-width="3" stroke-linecap="round"/><line x1="42" y1="3" x2="28" y2="16" stroke="var(--brass)" stroke-width="3" stroke-linecap="round"/><rect x="8" y="20" width="32" height="22" rx="5" fill="var(--rouge)"/><ellipse cx="24" cy="20" rx="16" ry="5" fill="var(--ink)" stroke="var(--brass)" stroke-width="2"/><path d="M12 25 L17 40 M22 25 L27 40 M32 25 L37 40" stroke="var(--brass)" stroke-width="2"/><circle cx="19" cy="31" r="2.5" fill="var(--stage)"/><circle cx="29" cy="31" r="2.5" fill="var(--stage)"/></svg>
+        <div class="meta" id="round-label">Manche 1/5</div>
+        <span id="round-kind" class="tag"></span>
+      </div>
+      <p id="scenario" class="scenario"></p>
+      <p id="scenario-en" class="dim" hidden></p>
+      <div class="row">
+        <button id="btn-repeat">Réécouter</button>
+        <button id="btn-slow">Lentement</button>
+        <button id="btn-en">English</button>
+      </div>
+      <div id="useful-words" class="words"></div>
+    </div>
+    <div style="height:14px"></div>
+    <div class="timer" aria-hidden="true"><div id="timer-bar"></div></div>
+    <div style="height:10px"></div>
+    <div id="players" class="players"></div>
+    <div style="height:14px"></div>
+    <div class="panel">
+      <label for="answer" class="dim">Ta réponse</label>
+      <textarea id="answer" placeholder="Écris ou dicte ta réponse en français…" autocomplete="off" autocapitalize="sentences" spellcheck="false"></textarea>
+      <div class="mic-hint"><span class="key" aria-hidden="true">🎤</span><span><b>To speak:</b> tap the box, then the microphone key on your iPhone keyboard. Switch the keyboard to French (🌐) so it understands you.</span></div>
+      <div class="row"><button id="btn-submit" class="go push">Envoyer au Juge</button></div>
+    </div>
+  </section>
+
+  <!-- Results -->
+  <section id="screen-results" hidden>
+    <div class="podium">
+      <div class="judge-row">
+        <svg class="drum" viewBox="0 0 48 48" aria-hidden="true"><line x1="6" y1="3" x2="20" y2="16" stroke="var(--brass)" stroke-width="3" stroke-linecap="round"/><line x1="42" y1="3" x2="28" y2="16" stroke="var(--brass)" stroke-width="3" stroke-linecap="round"/><rect x="8" y="20" width="32" height="22" rx="5" fill="var(--rouge)"/><ellipse cx="24" cy="20" rx="16" ry="5" fill="var(--ink)" stroke="var(--brass)" stroke-width="2"/><path d="M12 25 L17 40 M22 25 L27 40 M32 25 L37 40" stroke="var(--brass)" stroke-width="2"/><circle cx="19" cy="31" r="2.5" fill="var(--stage)"/><circle cx="29" cy="31" r="2.5" fill="var(--stage)"/></svg>
+        <div class="meta">Le verdict</div>
+        <button id="btn-hear-verdict">Réécouter</button>
+      </div>
+      <p id="verdict" class="scenario"></p>
+      <div id="results-table" style="display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+    <div style="height:14px"></div>
+    <div class="panel">
+      <h2>Ta réponse</h2>
+      <p class="yours" id="your-answer"></p>
+      <h3>Correction</h3>
+      <p id="corrected" class="good"></p>
+      <ul id="mistakes"></ul>
+      <h3>Comme un Français</h3>
+      <p id="better" class="good"></p>
+      <div class="row"><button id="btn-hear-better">Écouter</button></div>
+      <h3>Répète après moi</h3>
+      <p class="dim">Listen, then dictate the sentence with the keyboard microphone and check it.</p>
+      <div class="chat-in">
+        <input id="drill-input" placeholder="Dicte la phrase ici…" autocomplete="off">
+        <button id="btn-drill">Vérifier</button>
+      </div>
+      <p id="drill-result" class="dim"></p>
+      <p id="tip" class="tip"></p>
+      <div id="new-words" class="words"></div>
+    </div>
+    <div style="height:14px"></div>
+    <button id="btn-next" class="go big">Manche suivante</button>
+  </section>
+
+  <!-- Final -->
+  <section id="screen-final" class="podium" hidden>
+    <h2>Fin de la partie</h2>
+    <p id="final-verdict" class="scenario"></p>
+    <div id="final-table" style="display:flex;flex-direction:column;gap:8px"></div>
+    <button id="btn-again" class="go big">Rejouer</button>
+  </section>
+
+  <!-- Chat -->
+  <section id="chat" class="panel">
+    <h2>Le chat des joueurs</h2>
+    <div id="chat-log" aria-live="polite"></div>
+    <div class="chat-in">
+      <input id="chat-input" placeholder="Écris aux bots en français…" autocomplete="off">
+      <button id="btn-chat-send" class="go">Envoyer</button>
+    </div>
+  </section>
+</div>
+
+<div id="toast" role="alert" hidden></div>
+
+<script>
+(() => {
+// ---------- players ----------
+const BOTS = [
+  { name: "Camille", color: "#f59ac0", pitch: 1.25,
+    persona: "Camille, a confident, slightly snobbish Parisian who loves showing off elegant French. Stylish, dramatic answers, always correct French." },
+  { name: "Théo", color: "#7fd6e0", pitch: 0.9,
+    persona: "Théo, a funny gamer from Lyon who loves absurd, chaotic solutions. Casual spoken French (ouais, trop, grave) but easy to understand." },
+  { name: "Léa", color: "#b9e07f", pitch: 1.1,
+    persona: "Léa, a shy, kind student who is also learning French (about A2). Simple answers with 1-2 typical learner mistakes (gender, agreement, tense) so the player sees mistakes corrected too." },
+];
+const YOU = "Toi";
+const PLAYERS = [YOU, ...BOTS.map((b) => b.name)];
+const botOf = (n) => BOTS.find((b) => b.name === n);
+const LEVEL = {
+  A1: "CEFR A1: very short sentences, present tense, the most common 1000 words, no idioms.",
+  A2: "CEFR A2: short sentences, present / passé composé / futur proche, everyday words, at most one simple idiom.",
+};
+
+const $ = (id) => document.getElementById(id);
+function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+function avatar(name) {
+  const a = el("span", "av", name === YOU ? "★" : name[0]);
+  a.style.background = name === YOU ? "var(--bleu)" : botOf(name)?.color || "var(--dim)";
+  if (name === YOU) a.style.color = "#fff";
+  return a;
+}
+
+// ---------- settings (per viewer convenience) ----------
+const DEFAULTS = { level: "A2", timer: 60, rate: 0.85, tier: "default", botVoice: true, autoEn: false };
+let settings = { ...DEFAULTS };
+try { settings = { ...DEFAULTS, ...JSON.parse(localStorage.getItem("juge.settings") || "{}") }; } catch {}
+function saveSettings() { try { localStorage.setItem("juge.settings", JSON.stringify(settings)); } catch {} }
+
+let lastScreen = "lobby";
+function show(name) {
+  for (const s of ["settings", "lobby", "round", "results", "final"]) $(`screen-${s}`).hidden = s !== name;
+  $("chat").hidden = name === "round" || name === "settings";
+  if (name !== "settings") lastScreen = name;
+  window.scrollTo(0, 0);
+}
+$("btn-settings").onclick = () => {
+  if (!$("screen-settings").hidden) return $("btn-settings-ok").onclick();
+  $("set-level").value = settings.level;
+  $("set-timer").value = String(settings.timer);
+  $("set-rate").value = String(settings.rate);
+  $("set-tier").value = settings.tier;
+  $("set-botvoice").checked = settings.botVoice;
+  $("set-autoen").checked = settings.autoEn;
+  pauseTimer();
+  show("settings");
+};
+$("btn-settings-ok").onclick = () => {
+  settings = {
+    level: $("set-level").value, timer: Number($("set-timer").value), rate: Number($("set-rate").value),
+    tier: $("set-tier").value, botVoice: $("set-botvoice").checked, autoEn: $("set-autoen").checked,
+  };
+  saveSettings();
+  show(lastScreen);
+  if (lastScreen === "round") resumeTimer();
+};
+
+function toast(msg) {
+  const t = $("toast");
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toast.t); toast.t = setTimeout(() => (t.hidden = true), 6000);
+}
+
+// ---------- voice (text-to-speech) ----------
+const tts = "speechSynthesis" in window ? window.speechSynthesis : null;
+let voices = [];
+function loadVoices() { if (tts) voices = tts.getVoices().filter((v) => (v.lang || "").toLowerCase().startsWith("fr")); }
+if (tts) { loadVoices(); tts.onvoiceschanged = loadVoices; }
+function unlockAudio() { if (!tts) return; const u = new SpeechSynthesisUtterance(" "); u.volume = 0; tts.speak(u); }
+function stopSpeaking() { if (tts) tts.cancel(); }
+function speak(text, { rate = settings.rate, pitch = 1, voice = 0 } = {}) {
+  return new Promise((resolve) => {
+    if (!tts || !text) return resolve();
+    if (!voices.length) loadVoices();
+    const u = new SpeechSynthesisUtterance(text);
+    u.lang = "fr-FR"; u.rate = rate; u.pitch = pitch;
+    const pool = voices.filter((v) => v.lang.toLowerCase() === "fr-fr");
+    const list = pool.length ? pool : voices;
+    if (list.length) u.voice = list[voice % list.length];
+    u.onend = u.onerror = () => resolve();
+    tts.speak(u);
+    setTimeout(resolve, 2000 + text.length * 120); // never hang if the end event is lost
+  });
+}
+async function judgeSays(text, rate) {
+  document.querySelectorAll(".drum").forEach((d) => d.classList.add("talking"));
+  await speak(text, { rate: rate ?? settings.rate, voice: 0 });
+  document.querySelectorAll(".drum").forEach((d) => d.classList.remove("talking"));
+}
+function botSays(name, text) {
+  if (!settings.botVoice) return Promise.resolve();
+  const i = BOTS.findIndex((b) => b.name === name);
+  return speak(text, { rate: settings.rate + 0.05, pitch: botOf(name)?.pitch ?? 1, voice: i + 1 });
+}
+
+// ---------- Claude (on the viewer's own account) ----------
+const sampleP = window.claude?.use ? window.claude.use("sample") : Promise.resolve(null);
+sampleP.then((s) => { if (!s) { $("btn-play").disabled = true; $("unavailable").hidden = false; } });
+let blocked = false;
+const ERR = {
+  not_granted: "Claude isn't allowed on this page. Open the artifact's Permissions menu to allow it.",
+  sampling_disabled: "Claude isn't available for this account.",
+  rate_limited: "Too many requests, or your plan's usage limit was reached. Wait a moment, then try again.",
+  session_expired: "Sign in to claude.ai again, then reload.",
+  refused: "The judge declined this one. Try a different answer.",
+  invalid_json: "The judge's reply came back garbled. Tap again to retry.",
+  empty_completion: "The judge said nothing. Tap again to retry.",
+};
+function errText(e) { return ERR[e?.code] || "Connection problem. Tap again to retry."; }
+async function ask(prompt, tier) {
+  const sample = await sampleP;
+  if (!sample || blocked) throw { code: "sampling_disabled" };
+  try {
+    return await sample.json(prompt, { modelTier: tier, cache: false });
+  } catch (e) {
+    if (["not_granted", "sampling_disabled", "not_declared", "capability_disabled", "capability_removed"].includes(e?.code)) {
+      blocked = true; $("btn-play").disabled = true; $("unavailable").hidden = false;
+    }
+    throw e;
+  }
+}
+const levelLine = () => LEVEL[settings.level] || LEVEL.A2;
+const botsLine = () => BOTS.map((b) => `- ${b.name}: ${b.persona}`).join("\n");
+
+function promptRound(kind, recent) {
+  const what = kind === "absurd"
+    ? "an absurd, funny survival scenario in the style of the Roblox game 'AI Judge' (for example: a dragon attacks your bakery; you shrink to the size of an ant before an exam). Ask what the player does."
+    : "a realistic everyday situation in France (café, pharmacy, train station, neighbour, work, doctor, lost luggage…) with a small problem to solve. Ask what the player does or says.";
+  return `You are the game master of a French speaking game for a learner. Write all French for this level: ${levelLine()}
+
+Create ${what}
+The scenario is 1-2 short French sentences, uses "tu", and ends with a question.
+Do not repeat these recent scenarios: ${recent.join(" | ") || "none"}.
+Then write each bot player's answer: 1-2 French sentences at the same level, in character.
+${botsLine()}
+
+Reply with only JSON in this shape:
+{"scenario_fr": "…", "scenario_en": "English translation", "useful_words": [{"fr": "…", "en": "…"}], "bot_answers": [{"bot": "Camille", "answer": "…"}, {"bot": "Théo", "answer": "…"}, {"bot": "Léa", "answer": "…"}]}
+Give 3 useful_words the player might need to answer.`;
+}
+
+function promptJudge(scenario, answer, botAnswers) {
+  const all = [{ player: YOU, answer }, ...botAnswers.map((b) => ({ player: b.bot, answer: b.answer }))];
+  return `You are "Le Juge", a dramatic, funny, kind game-show judge (a sentient drum, like the Roblox game AI Judge) in a French speaking game for a learner. Write your French at this level: ${levelLine()}
+
+Score every player: idea 0-5 (creative, smart or funny, and it solves the problem) and french 0-5 (grammar, vocabulary, natural phrasing; 5 = correct and natural for the level).
+Judge the human ("${YOU}") fairly. A short correct answer can beat a long wrong one. The human must not always win or always lose.
+The human may have dictated with the phone keyboard, so ignore missing punctuation, capitals and obvious dictation glitches.
+If the human answer is empty or not in French, give french 0 and say so kindly.
+
+Scenario: ${scenario}
+Answers: ${JSON.stringify(all)}
+
+Reply with only JSON in this shape:
+{"results": [{"player": "${YOU}", "idea": 0, "french": 0, "comment_fr": "short funny comment, max 15 words"}, …one per player in the same order],
+ "winner": "player name with the best total",
+ "verdict_fr": "what the judge announces out loud, 2 short dramatic sentences",
+ "feedback": {"corrected": "the human's answer rewritten in correct French, same idea (repeat it if already perfect)",
+   "mistakes": [{"wrong": "…", "right": "…", "why_en": "short English explanation"}],
+   "better_version": "how a native speaker would say it, same level",
+   "tip_en": "one short, actionable tip in English",
+   "new_words": [{"fr": "…", "en": "…"}]},
+ "reactions": [{"bot": "one of the bots", "text": "short French reaction to the human's answer, in character"}]}
+Use an empty mistakes array when there are none. Give 2-3 new_words and 1-2 reactions.`;
+}
+
+function promptChat(history) {
+  return `You play the bot players in the lobby chat of a French speaking game. The human is a French learner. Level: ${levelLine()}
+Bots:
+${botsLine()}
+Rules: reply in French only. 1 or 2 bots reply this turn. Each message is at most 20 words, in character, and keeps the conversation going, often with a question to the human. Do not correct the human directly; reuse the correct form naturally in your reply instead. If the human wrote in English, answer in simple French and put a short English hint in hint_en; otherwise hint_en is "".
+
+Chat so far, oldest first: ${JSON.stringify(chatHistory.slice(-20))}
+
+Reply with only JSON in this shape:
+{"replies": [{"bot": "Léa", "text": "…"}], "hint_en": ""}`;
+}
+
+// ---------- chat ----------
+const chatHistory = [];
+function addMsg(from, text, kind = "") {
+  const log = $("chat-log");
+  let m;
+  if (kind === "sys") { m = el("div", "msg sys", text); }
+  else {
+    m = el("div", `msg ${from === YOU ? "me" : ""}`);
+    const b = el("div", "bubble");
+    if (from !== YOU) b.append(el("span", "from", from));
+    b.append(text);
+    if (from !== YOU) m.append(avatar(from));
+    m.append(b);
+    chatHistory.push({ from, text });
+  }
+  log.append(m);
+  log.scrollTop = log.scrollHeight;
+  return m;
+}
+let chatBusy = false;
+async function sendChat() {
+  const text = $("chat-input").value.trim();
+  if (!text || chatBusy) return;
+  unlockAudio();
+  $("chat-input").value = "";
+  addMsg(YOU, text);
+  chatBusy = true; $("btn-chat-send").disabled = true;
+  const typing = addMsg("", "Les bots écrivent", "sys"); typing.classList.add("thinking");
+  try {
+    const res = await ask(promptChat(chatHistory), "quick");
+    typing.remove();
+    for (const r of (res.replies || []).filter((r) => botOf(r.bot))) { addMsg(r.bot, r.text); await botSays(r.bot, r.text); }
+    if (res.hint_en) addMsg("", `Hint: ${res.hint_en}`, "sys");
+  } catch (e) {
+    typing.remove(); toast(errText(e));
+  } finally { chatBusy = false; $("btn-chat-send").disabled = false; }
+}
+$("btn-chat-send").onclick = sendChat;
+$("chat-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); sendChat(); } });
+
+// ---------- game ----------
+let game = null, round = null, timer = null, timeLeft = 0;
+function recent() { try { return JSON.parse(localStorage.getItem("juge.recent") || "[]"); } catch { return []; } }
+function remember(s) { try { localStorage.setItem("juge.recent", JSON.stringify([s, ...recent()].slice(0, 15))); } catch {} }
+
+function renderScorebar() {
+  const bar = $("scorebar");
+  if (!game) return bar.replaceChildren();
+  bar.replaceChildren(...PLAYERS.map((p) => { const c = el("span", "chip"); c.append(avatar(p), String(game.scores[p])); c.title = p; return c; }));
+}
+function renderPlayers(done) {
+  $("players").replaceChildren(...PLAYERS.map((p) => { const c = el("span", "chip"); c.append(avatar(p), `${p} · ${done[p] ? "a répondu" : "écrit…"}`); return c; }));
+}
+
+$("btn-play").onclick = () => {
+  unlockAudio();
+  game = { n: 0, total: Number($("rounds-count").value), scores: Object.fromEntries(PLAYERS.map((p) => [p, 0])), absurdFirst: Math.random() < 0.5 };
+  renderScorebar();
+  startRound();
+};
+$("btn-again").onclick = () => $("btn-play").onclick();
+$("btn-next").onclick = () => { unlockAudio(); game.n >= game.total ? finishGame() : startRound(); };
+
+async function startRound() {
+  stopSpeaking();
+  game.n++;
+  const kind = ((game.n % 2 === 1) === game.absurdFirst) ? "absurd" : "real";
+  round = null;
+  show("round");
+  $("round-label").textContent = `Manche ${game.n} sur ${game.total}`;
+  $("round-kind").textContent = kind === "absurd" ? "Absurde" : "Vie réelle";
+  $("scenario").replaceChildren(el("span", "thinking", "Le Juge prépare la question"));
+  $("scenario-en").hidden = true;
+  $("useful-words").replaceChildren();
+  $("answer").value = ""; $("answer").disabled = true; $("btn-submit").disabled = true;
+  setBar(1); renderPlayers({});
+
+  let r;
+  try {
+    r = await ask(promptRound(kind, recent()), "quick");
+    if (!r?.scenario_fr || !Array.isArray(r.bot_answers)) throw { code: "invalid_json" };
+  } catch (e) {
+    toast(errText(e)); game.n--; show(game.n ? "results" : "lobby");
+    if (!game.n) game = null, renderScorebar();
+    return;
+  }
+  round = { ...r, kind, bot_answers: r.bot_answers.filter((b) => botOf(b.bot)) };
+  remember(round.scenario_fr);
+  $("scenario").textContent = round.scenario_fr;
+  $("scenario-en").textContent = round.scenario_en || "";
+  $("scenario-en").hidden = !settings.autoEn;
+  $("useful-words").replaceChildren(...(round.useful_words || []).map((w) => { const s = el("span"); s.append(el("b", null, w.fr), ` ${w.en}`); return s; }));
+  $("answer").disabled = false; $("btn-submit").disabled = false;
+  const mine = round;
+  await judgeSays(round.scenario_fr);
+  if (round === mine && !round.submitted) startTimer();
+}
+
+function setBar(f) { $("timer-bar").style.width = `${Math.max(0, f) * 100}%`; $("timer-bar").classList.toggle("low", f < 0.25); }
+function startTimer() {
+  round.done = {};
+  round.botAt = Object.fromEntries(BOTS.map((b) => [b.name, 5 + Math.random() * ((settings.timer || 40) * 0.7)]));
+  round.elapsed = 0;
+  resumeTimer();
+}
+function resumeTimer() {
+  if (!round || round.submitted || !round.botAt) return;
+  clearInterval(timer);
+  let last = Date.now();
+  timer = setInterval(() => {
+    round.elapsed += (Date.now() - last) / 1000; last = Date.now();
+    for (const [n, at] of Object.entries(round.botAt)) if (round.elapsed >= at) round.done[n] = true;
+    renderPlayers(round.done);
+    if (settings.timer) { setBar(1 - round.elapsed / settings.timer); if (round.elapsed >= settings.timer) submit(true); }
+  }, 500);
+}
+function pauseTimer() { clearInterval(timer); }
+
+$("btn-repeat").onclick = () => round && judgeSays(round.scenario_fr);
+$("btn-slow").onclick = () => round && judgeSays(round.scenario_fr, 0.6);
+$("btn-en").onclick = () => { $("scenario-en").hidden = !$("scenario-en").hidden; };
+$("btn-submit").onclick = () => submit(false);
+
+async function submit(timeUp) {
+  if (!round || round.submitted) return;
+  round.submitted = true;
+  pauseTimer(); stopSpeaking();
+  const answer = $("answer").value.trim();
+  $("answer").disabled = true; $("btn-submit").disabled = true;
+  renderPlayers(Object.fromEntries(PLAYERS.map((p) => [p, true])));
+  $("btn-submit").replaceChildren(el("span", "thinking", timeUp ? "Temps écoulé ! Le Juge délibère" : "Le Juge délibère"));
+  let res;
+  try {
+    res = await ask(promptJudge(round.scenario_fr, answer || "(pas de réponse)", round.bot_answers), settings.tier);
+    if (!Array.isArray(res?.results) || !res.feedback) throw { code: "invalid_json" };
+  } catch (e) {
+    toast(errText(e));
+    round.submitted = false;
+    $("answer").disabled = false; $("btn-submit").disabled = false; $("btn-submit").textContent = "Envoyer au Juge";
+    return;
+  }
+  $("btn-submit").textContent = "Envoyer au Juge";
+  showResults(answer, res);
+}
+
+const pts = (r) => (Number(r.idea) || 0) + (Number(r.french) || 0);
+function showResults(answer, res) {
+  show("results");
+  const answers = { [YOU]: answer || "(pas de réponse)", ...Object.fromEntries(round.bot_answers.map((b) => [b.bot, b.answer])) };
+  const results = res.results.filter((r) => PLAYERS.includes(r.player));
+  for (const r of results) game.scores[r.player] += pts(r);
+  renderScorebar();
+  round.verdict = res.verdict_fr || "";
+  $("verdict").textContent = round.verdict;
+  $("results-table").replaceChildren(...results.map((r) => {
+    const d = el("div", `result ${r.player === res.winner ? "win" : ""}`);
+    const who = el("div", "who"); who.append(avatar(r.player), r.player);
+    if (r.player === res.winner) who.append(el("span", "crown", "Gagnant"));
+    who.append(el("span", "pts", `${pts(r)}/10`));
+    d.append(who, el("p", null, answers[r.player] || ""), el("p", "com", `Idée ${r.idea}/5 · Français ${r.french}/5. ${r.comment_fr || ""}`));
+    return d;
+  }));
+  const f = res.feedback;
+  $("your-answer").textContent = answers[YOU];
+  $("corrected").textContent = f.corrected || "";
+  const mistakes = Array.isArray(f.mistakes) ? f.mistakes : [];
+  $("mistakes").replaceChildren(...mistakes.map((m) => { const li = el("li"); li.append(el("s", null, m.wrong), " → ", el("b", null, m.right), ` (${m.why_en})`); return li; }));
+  if (!mistakes.length) $("mistakes").append(el("li", null, "Aucune faute. Bravo !"));
+  $("better").textContent = f.better_version || "";
+  $("tip").textContent = f.tip_en ? `Tip: ${f.tip_en}` : "";
+  $("tip").hidden = !f.tip_en;
+  $("drill-input").value = ""; $("drill-result").textContent = "";
+  $("new-words").replaceChildren(...(f.new_words || []).map((w) => { const s = el("span"); s.append(el("b", null, w.fr), ` ${w.en}`); return s; }));
+  $("btn-next").textContent = game.n >= game.total ? "Résultats finaux" : "Manche suivante";
+  addMsg("", `Manche ${game.n} : ${res.winner} gagne`, "sys");
+  (async () => {
+    await judgeSays(round.verdict);
+    for (const r of (res.reactions || []).filter((r) => botOf(r.bot))) { addMsg(r.bot, r.text); await botSays(r.bot, r.text); }
+  })();
+}
+$("btn-hear-verdict").onclick = () => round && judgeSays(round.verdict);
+$("btn-hear-better").onclick = () => judgeSays($("better").textContent);
+
+function words(s) { return s.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-z0-9' ]/g, " ").split(/\s+/).filter(Boolean); }
+function similarity(target, said) { const t = words(target), s = new Set(words(said)); return t.length ? Math.round(t.filter((w) => s.has(w)).length / t.length * 100) : 0; }
+function checkDrill() {
+  const said = $("drill-input").value.trim();
+  if (!said) return;
+  const score = similarity($("better").textContent, said);
+  $("drill-result").textContent = `${score}% des mots. ${score >= 85 ? "Parfait !" : score >= 60 ? "Presque ! Réécoute et recommence." : "Réécoute et essaie encore."}`;
+}
+$("btn-drill").onclick = checkDrill;
+$("drill-input").addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); checkDrill(); } });
+
+function finishGame() {
+  show("final");
+  const ranking = PLAYERS.map((p) => [p, game.scores[p]]).sort((a, b) => b[1] - a[1]);
+  const top = ranking[0][1];
+  const winners = ranking.filter(([, s]) => s === top).map(([p]) => p);
+  const line = winners.includes(YOU)
+    ? (winners.length > 1 ? "Égalité ! Tu partages la victoire. Bravo !" : "Incroyable ! Tu es le grand gagnant ! Bravo !")
+    : `Le grand gagnant est ${winners[0]} ! Tu feras mieux la prochaine fois !`;
+  $("final-verdict").textContent = line;
+  $("final-table").replaceChildren(...ranking.map(([p, s], i) => {
+    const d = el("div", `result ${s === top ? "win" : ""}`);
+    const who = el("div", "who"); who.append(el("span", "dim", `${i + 1}.`), avatar(p), p, el("span", "pts", `${s} pts`));
+    d.append(who); return d;
+  }));
+  judgeSays(line);
+  addMsg("", "Fin de la partie. Parle avec les bots !", "sys");
+}
+
+// ---------- start ----------
+show("lobby");
+addMsg("Camille", "Bonjour ! Tu es prêt pour le Juge ? Moi, je vais gagner, évidemment.");
+addMsg("Léa", "Salut ! Moi aussi, j'apprends le français. Tu viens d'où ?");
+})();
+</script>
