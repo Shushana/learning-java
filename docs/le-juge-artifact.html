@@ -27,7 +27,7 @@ body {
   font: 17px/1.5 var(--f-body);
   padding-left: max(16px, env(safe-area-inset-left, 0px));
   padding-right: max(16px, env(safe-area-inset-right, 0px));
-  padding-block: 0 32px;
+  padding-block: 0 112px;
   -webkit-text-size-adjust: 100%;
 }
 .wrap { max-width: 620px; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
@@ -108,9 +108,15 @@ label.check { display: flex; gap: 10px; align-items: center; font-size: 16px; }
 label.check input { width: 22px; height: 22px; flex: none; }
 .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
 @media (max-width: 380px) { .grid2 { grid-template-columns: 1fr; } }
+#action-bar {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 8;
+  padding: 12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: linear-gradient(to top, var(--stage) 70%, transparent);
+}
+#action-bar button { display: block; max-width: 620px; margin: 0 auto; }
 #toast {
   position: fixed; left: max(16px, env(safe-area-inset-left, 0px)); right: max(16px, env(safe-area-inset-right, 0px));
-  bottom: calc(16px + env(safe-area-inset-bottom, 0px)); z-index: 10;
+  bottom: calc(96px + env(safe-area-inset-bottom, 0px)); z-index: 10;
   background: var(--rouge); color: #2a0000; padding: 12px 14px; border-radius: 12px; font-weight: 700;
 }
 .thinking::after { content: ""; display: inline-block; width: 1.2em; text-align: left; animation: dots 1.2s steps(4) infinite; }
@@ -240,7 +246,6 @@ label.check input { width: 22px; height: 22px; flex: none; }
       <div id="new-words" class="words"></div>
     </div>
     <div style="height:14px"></div>
-    <button id="btn-next" class="go big">Manche suivante</button>
   </section>
 
   <!-- Final -->
@@ -248,7 +253,6 @@ label.check input { width: 22px; height: 22px; flex: none; }
     <h2>Fin de la partie</h2>
     <p id="final-verdict" class="scenario"></p>
     <div id="final-table" style="display:flex;flex-direction:column;gap:8px"></div>
-    <button id="btn-again" class="go big">Rejouer</button>
   </section>
 
   <!-- Chat -->
@@ -262,6 +266,7 @@ label.check input { width: 22px; height: 22px; flex: none; }
   </section>
 </div>
 
+<div id="action-bar" hidden><button id="btn-action" class="go big"></button></div>
 <div id="toast" role="alert" hidden></div>
 
 <script>
@@ -303,6 +308,7 @@ function show(name) {
   for (const s of ["settings", "lobby", "round", "results", "final"]) $(`screen-${s}`).hidden = s !== name;
   $("chat").hidden = name === "round" || name === "settings";
   if (name !== "settings") lastScreen = name;
+  updateActionBar(name);
   window.scrollTo(0, 0);
 }
 $("btn-settings").onclick = () => {
@@ -507,8 +513,19 @@ $("btn-play").onclick = () => {
   renderScorebar();
   startRound();
 };
-$("btn-again").onclick = () => $("btn-play").onclick();
-$("btn-next").onclick = () => { unlockAudio(); game.n >= game.total ? finishGame() : startRound(); };
+// The continue button is pinned to the bottom so it stays reachable while chatting.
+function updateActionBar(name) {
+  const bar = $("action-bar"), btn = $("btn-action");
+  if (name === "results" && game) {
+    btn.textContent = game.n >= game.total ? "Résultats finaux" : "Manche suivante";
+    btn.onclick = () => { unlockAudio(); game.n >= game.total ? finishGame() : startRound(); };
+    bar.hidden = false;
+  } else if (name === "final") {
+    btn.textContent = "Rejouer";
+    btn.onclick = () => $("btn-play").onclick();
+    bar.hidden = false;
+  } else bar.hidden = true;
+}
 
 async function startRound() {
   stopSpeaking();
@@ -620,7 +637,6 @@ function showResults(answer, res) {
   $("tip").hidden = !f.tip_en;
   $("drill-input").value = ""; $("drill-result").textContent = "";
   $("new-words").replaceChildren(...(f.new_words || []).map((w) => { const s = el("span"); s.append(el("b", null, w.fr), ` ${w.en}`); return s; }));
-  $("btn-next").textContent = game.n >= game.total ? "Résultats finaux" : "Manche suivante";
   addMsg("", `Manche ${game.n} : ${res.winner} gagne`, "sys");
   (async () => {
     await judgeSays(round.verdict);
