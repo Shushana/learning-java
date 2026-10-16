@@ -179,6 +179,9 @@ label.check input { width: 22px; height: 22px; flex: none; }
       <label class="field" style="flex-direction:row;align-items:center;gap:8px">Manches
         <select id="rounds-count" style="width:auto"><option>3</option><option selected>5</option><option>8</option></select>
       </label>
+      <label class="field" style="flex-direction:row;align-items:center;gap:8px">Thème
+        <select id="theme" style="width:auto"><option value="mix" selected>Mélange</option><option value="work">Travail et projets</option><option value="life">Vie quotidienne</option><option value="absurd">Absurde</option></select>
+      </label>
     </div>
     <button id="btn-play" class="go big">Jouer</button>
     <p id="unavailable" class="dim" hidden>Claude isn't available in this view. Open this page on claude.ai while signed in to play.</p>
@@ -274,11 +277,11 @@ label.check input { width: 22px; height: 22px; flex: none; }
 // ---------- players ----------
 const BOTS = [
   { name: "Camille", color: "#f59ac0", pitch: 1.25,
-    persona: "Camille, a confident, slightly snobbish Parisian who loves showing off elegant French. Stylish, dramatic answers, always correct French." },
+    persona: "Camille, a confident, slightly snobbish Parisian. Dramatic, over-the-top style; her ideas are sometimes more elegant than practical." },
   { name: "Théo", color: "#7fd6e0", pitch: 0.9,
     persona: "Théo, a funny gamer from Lyon who loves absurd, chaotic solutions. Casual spoken French (ouais, trop, grave) but easy to understand." },
   { name: "Léa", color: "#b9e07f", pitch: 1.1,
-    persona: "Léa, a shy, kind student who is also learning French (about A2). Simple answers with 1-2 typical learner mistakes (gender, agreement, tense) so the player sees mistakes corrected too." },
+    persona: "Léa, a shy, kind student who is also learning French (about A2). Simple, sensible answers; her French often has typical learner mistakes (gender, agreement, tense)." },
 ];
 const YOU = "Toi";
 const PLAYERS = [YOU, ...BOTS.map((b) => b.name)];
@@ -399,29 +402,103 @@ async function ask(prompt, tier) {
 const levelLine = () => LEVEL[settings.level] || LEVEL.A2;
 const botsLine = () => BOTS.map((b) => `- ${b.name}: ${b.persona}`).join("\n");
 
+// ---------- topics ----------
+// Seeds are short prompts; Claude invents the details. Each round draws a seed not used recently.
+const KINDS = {
+  real: { label: "Vie réelle", style: "a realistic everyday situation in France with a small problem to solve. Ask what the player does or says.", seeds: [
+    "your train is cancelled and you must talk to the agent at the station", "the waiter brings you the wrong dish", "you lost your keys and need help from a neighbour",
+    "the pharmacist asks about your symptoms", "you want to return a shirt without the receipt", "your Airbnb host doesn't answer and the door code doesn't work",
+    "you are invited to a French family dinner and don't like the main dish", "you need to make a doctor's appointment by phone", "a stranger asks you for directions to the metro",
+    "your neighbour's music is too loud at 1 a.m.", "you missed your stop on the bus", "at the bakery, they ran out of what you wanted",
+    "the hairdresser cut your hair much too short", "you are buying cheese at the market and don't know which to choose", "your suitcase didn't arrive at the airport",
+    "you must open a bank account in France", "your friend's birthday is today and you forgot", "you spill coffee on someone's laptop in a café",
+    "your car breaks down on a country road", "you want to rent a bike for the weekend", "the cinema seat you booked is taken",
+    "the landlord wants to raise your rent", "you get a parking ticket you think is unfair", "you have to call and cancel a gym subscription",
+    "it's raining and you have no umbrella before a date", "your phone dies and you need to call a taxi", "the hotel gave your room to someone else",
+    "the delivery person left your package at the wrong address", "you are lost in a museum and it's closing", "you must explain an allergy at a restaurant",
+    "your new flatmate never washes the dishes", "you want to join a French conversation club", "you find a wallet on the street", "you have to give a toast at a wedding",
+  ]},
+  work: { label: "Travail et projets", style: "a realistic work or project situation in a French-speaking office (meetings, colleagues, managers, clients, deadlines). Ask what the player does or says.", seeds: [
+    "your project is two weeks late and the manager asks why", "you must present your project to the director in 2 minutes", "a colleague takes credit for your work in a meeting",
+    "a client calls angry because a feature doesn't work", "you need to ask your manager for a day off on Friday", "you sent an email with 'reply all' by mistake",
+    "it's your first day and you must introduce yourself to the team", "the release is tonight and a critical bug appears", "you must explain a delay in the weekly status email",
+    "your colleague keeps interrupting you in meetings", "the client wants a new feature for free", "you have a job interview for your dream job",
+    "you must ask for a raise", "two colleagues disagree and ask you to decide", "the video call starts and your camera is stuck on",
+    "you must give feedback to a colleague whose work has many mistakes", "your manager asks you to work this weekend", "you must estimate how long a task will take",
+    "a new tool is imposed on the team and nobody likes it", "you must lead the morning stand-up meeting", "you forgot a meeting with an important client",
+    "the budget for your project is cut in half", "you must onboard a new colleague", "you need help from another team that is very busy",
+    "you must announce bad news to the team", "the office printer jams before an important meeting", "you must write a release note for users",
+    "a colleague asks you for help but you have no time", "you must negotiate a deadline with a client", "your laptop is stolen with the project files",
+    "the team lunch is today and you must choose the restaurant", "you must explain your job to a child", "a meeting has no agenda and is going nowhere",
+  ]},
+  absurd: { label: "Absurde", style: "an absurd, funny survival scenario in the style of the Roblox game 'AI Judge'. Ask what the player does.", seeds: [
+    "a dragon attacks your bakery", "you shrink to the size of an ant before an exam", "your cat becomes president of France",
+    "the Eiffel Tower starts walking away", "all the croissants in Paris disappear", "a giant snail blocks the only road to the airport",
+    "you wake up and can only speak by singing", "a pigeon steals your passport", "your fridge falls in love with you",
+    "it rains cheese for three days", "a ghost wants your apartment", "you are stuck in a lift with a bear",
+    "the sea turns into lemonade", "your shadow runs away", "a robot wants to take your place at your sister's wedding",
+    "you must win a dance battle against a penguin", "the moon lands in your garden", "your plants start to talk and complain",
+    "you are trapped in a giant baguette", "every door in the city opens onto the beach", "a cow is driving your car",
+    "your mirror shows a different person", "a pirate ship arrives on the Seine", "aliens want to learn to make crêpes",
+    "you find a door to the year 1789", "your umbrella flies you to Belgium", "a T-rex is in line at the post office",
+    "gravity stops for one hour", "your dog wins the lottery", "the river is full of chocolate and you can't swim", "your shoes decide where you go",
+  ]},
+  workAbsurd: { label: "Bureau absurde", style: "an absurd, funny work or project scenario in an office, in the style of the Roblox game 'AI Judge'. Ask what the player does.", seeds: [
+    "your laptop turns into a cat during the client demo", "the CEO is secretly a pigeon", "the meeting has lasted for three days",
+    "a goat ate the project plan", "the coffee machine becomes the new manager", "every email you send turns into a poem",
+    "your project deadline is yesterday and a time machine is in the kitchen", "the office floor turns into lava during a meeting", "the printer only prints love letters",
+    "your colleagues are replaced by penguins", "the Wi-Fi password is a riddle from a sphinx", "a dragon wants a job interview",
+    "the bug in the software is a real insect, and it's huge", "your PowerPoint presentation comes alive", "your boss can only speak in emojis",
+    "the release button is guarded by a sleeping bear", "the client is a ghost from the 18th century", "your chair rolls away with you to another city",
+    "the ticket system creates one new ticket every second", "the office plant wants a promotion", "an octopus applies to be your assistant",
+    "the elevator only goes to a secret floor", "your keyboard types in ancient Greek", "a magician steals the project budget", "the team-building activity is on a volcano",
+  ]},
+};
+const THEMES = { mix: ["real", "work", "absurd", "workAbsurd"], work: ["work", "workAbsurd"], life: ["real"], absurd: ["absurd", "workAbsurd"] };
+function usedSeeds() { try { return JSON.parse(localStorage.getItem("juge.seeds") || "[]"); } catch { return []; } }
+function pickSeed(kind) {
+  const used = new Set(usedSeeds());
+  const pool = KINDS[kind].seeds.filter((s) => !used.has(s));
+  const list = pool.length ? pool : KINDS[kind].seeds;
+  const seed = list[Math.floor(Math.random() * list.length)];
+  try { localStorage.setItem("juge.seeds", JSON.stringify([seed, ...usedSeeds()].slice(0, 80))); } catch {}
+  return seed;
+}
+const shuffle = (a) => { a = [...a]; for (let i = a.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [a[i], a[j]] = [a[j], a[i]]; } return a; };
+
+// Each round, every bot gets a random form so nobody is always the best.
+const IDEA_FORM = ["a clever, original idea that really solves the problem", "an ordinary, acceptable idea", "a weak idea: it misses the point, is impractical, or doesn't really answer"];
+const FRENCH_FORM = ["correct, natural French", "French with one small mistake", "French with two typical learner mistakes"];
+function botForms() {
+  const ideas = shuffle(IDEA_FORM), french = shuffle(FRENCH_FORM);
+  return BOTS.map((b, i) => `- ${b.name} (${b.persona}) This round: ${ideas[i]}; ${french[i]}.`).join("\n");
+}
+
 function promptRound(kind, recent) {
-  const what = kind === "absurd"
-    ? "an absurd, funny survival scenario in the style of the Roblox game 'AI Judge' (for example: a dragon attacks your bakery; you shrink to the size of an ant before an exam). Ask what the player does."
-    : "a realistic everyday situation in France (café, pharmacy, train station, neighbour, work, doctor, lost luggage…) with a small problem to solve. Ask what the player does or says.";
+  const what = `${KINDS[kind].style}\nBuild it on this idea, inventing concrete details: ${pickSeed(kind)}.`;
   return `You are the game master of a French speaking game for a learner. Write all French for this level: ${levelLine()}
 
 Create ${what}
 The scenario is 1-2 short French sentences, uses "tu", and ends with a question.
 Do not repeat these recent scenarios: ${recent.join(" | ") || "none"}.
-Then write each bot player's answer: 1-2 French sentences at the same level, in character.
-${botsLine()}
+Then write each bot player's answer: 1-2 French sentences at the same level, in character, following the form given for this round exactly (mistakes must be real, natural learner mistakes):
+${botForms()}
 
 Reply with only JSON in this shape:
 {"scenario_fr": "…", "scenario_en": "English translation", "useful_words": [{"fr": "…", "en": "…"}], "bot_answers": [{"bot": "Camille", "answer": "…"}, {"bot": "Théo", "answer": "…"}, {"bot": "Léa", "answer": "…"}]}
 Give 3 useful_words the player might need to answer.`;
 }
 
-function promptJudge(scenario, answer, botAnswers) {
-  const all = [{ player: YOU, answer }, ...botAnswers.map((b) => ({ player: b.bot, answer: b.answer }))];
+// The judge sees anonymous, shuffled labels so it can't favour a name.
+function promptJudge(scenario, answer, botAnswers, labels) {
+  const all = shuffle([{ player: YOU, answer }, ...botAnswers.map((b) => ({ player: b.bot, answer: b.answer }))])
+    .map((a, i) => { const l = `Joueur ${"ABCD"[i]}`; labels[l] = a.player; return { player: l, answer: a.answer }; });
+  const human = Object.keys(labels).find((l) => labels[l] === YOU);
   return `You are "Le Juge", a dramatic, funny, kind game-show judge (a sentient drum, like the Roblox game AI Judge) in a French speaking game for a learner. Write your French at this level: ${levelLine()}
 
 Score every player: idea 0-5 (creative, smart or funny, and it solves the problem) and french 0-5 (grammar, vocabulary, natural phrasing; 5 = correct and natural for the level).
-Judge the human ("${YOU}") fairly. A short correct answer can beat a long wrong one. The human must not always win or always lose.
+Score each answer on its own merits. Style and long words do not earn points by themselves: an idea scores high only if it actually solves the problem, and a short correct answer can beat a long, fancy one. Do not favour any player.
+The human learner is ${human}.
 The human may have dictated with the phone keyboard, so ignore missing punctuation, capitals and obvious dictation glitches.
 If the human answer is empty or not in French, give french 0 and say so kindly.
 
@@ -429,15 +506,16 @@ Scenario: ${scenario}
 Answers: ${JSON.stringify(all)}
 
 Reply with only JSON in this shape:
-{"results": [{"player": "${YOU}", "idea": 0, "french": 0, "comment_fr": "short funny comment, max 15 words"}, …one per player in the same order],
- "winner": "player name with the best total",
- "verdict_fr": "what the judge announces out loud, 2 short dramatic sentences",
+{"results": [{"player": "Joueur A", "idea": 0, "french": 0, "comment_fr": "short funny comment, max 15 words, without naming the player"}, …one per player in the same order],
+ "winner": "the label with the best total",
+ "verdict_fr": "what the judge announces out loud, 2 short dramatic sentences, naming the winner by their label",
  "feedback": {"corrected": "the human's answer rewritten in correct French, same idea (repeat it if already perfect)",
    "mistakes": [{"wrong": "…", "right": "…", "why_en": "short English explanation"}],
    "better_version": "how a native speaker would say it, same level",
    "tip_en": "one short, actionable tip in English",
    "new_words": [{"fr": "…", "en": "…"}]},
- "reactions": [{"bot": "one of the bots", "text": "short French reaction to the human's answer, in character"}]}
+ "reactions": [{"bot": "Camille, Théo or Léa", "text": "short French reaction to the human's answer, in character"}]}
+"feedback" is about ${human}'s answer only. The bots who react are: ${botsLine()}
 Use an empty mistakes array when there are none. Give 2-3 new_words and 1-2 reactions.`;
 }
 
@@ -509,7 +587,7 @@ function renderPlayers(done) {
 
 $("btn-play").onclick = () => {
   unlockAudio();
-  game = { n: 0, total: Number($("rounds-count").value), scores: Object.fromEntries(PLAYERS.map((p) => [p, 0])), absurdFirst: Math.random() < 0.5 };
+  game = { n: 0, total: Number($("rounds-count").value), scores: Object.fromEntries(PLAYERS.map((p) => [p, 0])), kinds: shuffle(THEMES[$("theme").value] || THEMES.mix) };
   renderScorebar();
   startRound();
 };
@@ -530,11 +608,11 @@ function updateActionBar(name) {
 async function startRound() {
   stopSpeaking();
   game.n++;
-  const kind = ((game.n % 2 === 1) === game.absurdFirst) ? "absurd" : "real";
+  const kind = game.kinds[(game.n - 1) % game.kinds.length];
   round = null;
   show("round");
   $("round-label").textContent = `Manche ${game.n} sur ${game.total}`;
-  $("round-kind").textContent = kind === "absurd" ? "Absurde" : "Vie réelle";
+  $("round-kind").textContent = KINDS[kind].label;
   $("scenario").replaceChildren(el("span", "thinking", "Le Juge prépare la question"));
   $("scenario-en").hidden = true;
   $("useful-words").replaceChildren();
@@ -597,8 +675,10 @@ async function submit(timeUp) {
   $("btn-submit").replaceChildren(el("span", "thinking", timeUp ? "Temps écoulé ! Le Juge délibère" : "Le Juge délibère"));
   let res;
   try {
-    res = await ask(promptJudge(round.scenario_fr, answer || "(pas de réponse)", round.bot_answers), settings.tier);
+    const labels = {};
+    res = await ask(promptJudge(round.scenario_fr, answer || "(pas de réponse)", round.bot_answers, labels), settings.tier);
     if (!Array.isArray(res?.results) || !res.feedback) throw { code: "invalid_json" };
+    unmask(res, labels);
   } catch (e) {
     toast(errText(e));
     round.submitted = false;
@@ -609,6 +689,19 @@ async function submit(timeUp) {
   showResults(answer, res);
 }
 
+// Turn "Joueur B" back into real names, in table order, and make sure the winner has the top score.
+function unmask(res, labels) {
+  const byLabel = (l) => labels[String(l).replace(/^.*?(Joueur [ABCD]).*$/i, (m, x) => x.replace(/^j/, "J"))];
+  for (const r of res.results) r.player = byLabel(r.player) || r.player;
+  res.results.sort((a, b) => PLAYERS.indexOf(a.player) - PLAYERS.indexOf(b.player));
+  const top = Math.max(...res.results.map(pts));
+  const named = byLabel(res.winner);
+  res.winner = res.results.some((r) => r.player === named && pts(r) === top) ? named : res.results.find((r) => pts(r) === top)?.player;
+  res.verdict_fr = String(res.verdict_fr || "").replace(/(?:\b(?:le|la|au)\s+)?joueur\s+([ABCD])\b/gi, (m, x) => {
+    const name = labels[`Joueur ${x.toUpperCase()}`];
+    return name === YOU ? "toi" : name || m;
+  });
+}
 const pts = (r) => (Number(r.idea) || 0) + (Number(r.french) || 0);
 function showResults(answer, res) {
   show("results");
