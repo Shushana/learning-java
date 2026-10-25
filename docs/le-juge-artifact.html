@@ -87,6 +87,17 @@ textarea { resize: vertical; min-height: 110px; }
 .result .who { display: flex; align-items: center; gap: 8px; font-weight: 700; }
 .result .pts { margin-left: auto; color: var(--brass); font-variant-numeric: tabular-nums; }
 .result .com { color: var(--dim); font-size: 14px; font-style: italic; }
+.crit { display: flex; flex-wrap: wrap; gap: 4px; }
+.crit span { font-size: 12px; padding: 2px 7px; border-radius: 6px; background: var(--podium-2); }
+.crit .ok { color: var(--vert); }
+.crit .ko { color: var(--rouge); }
+.rule { border: 1px dashed var(--brass); border-radius: 10px; padding: 6px 10px; font-size: 15px; }
+.rule b { color: var(--brass); }
+.good-k { color: var(--vert); }
+.miss-k { color: var(--rouge); }
+#my-criteria { margin: 0; padding-left: 20px; font-size: 15px; display: flex; flex-direction: column; gap: 4px; }
+details.criteria summary { cursor: pointer; color: var(--brass); font-weight: 700; }
+details.criteria ul { margin: 8px 0 0; padding-left: 20px; font-size: 15px; display: flex; flex-direction: column; gap: 3px; }
 .crown { font: 12px/1 var(--f-body); text-transform: uppercase; letter-spacing: 1px; color: var(--brass-ink); background: var(--brass); padding: 3px 7px; border-radius: 6px; }
 .yours { color: var(--dim); }
 .good { color: var(--vert); font-weight: 700; font-size: 19px; }
@@ -168,8 +179,13 @@ label.check input { width: 22px; height: 22px; flex: none; }
     <ol class="rules">
       <li>The judge reads a situation out loud: sometimes absurd, sometimes real life in France.</li>
       <li>You and three bots answer in French before the timer runs out.</li>
-      <li>Each answer gets up to 5 points for the idea and 5 for the French. You get your sentence corrected.</li>
+      <li>Each answer gets up to 5 points for content and 5 for the French. You get your sentence corrected.</li>
+      <li>Some rounds add a rule, such as "one sentence only". Follow it to score well.</li>
     </ol>
+    <details class="criteria">
+      <summary>Les critères du Juge</summary>
+      <ul id="criteria-list"></ul>
+    </details>
     <div class="example">
       <span class="lbl">Exemple de manche</span>
       <span><b>Le Juge :</b> Un dragon attaque ta boulangerie. Que fais-tu ?</span>
@@ -197,6 +213,7 @@ label.check input { width: 22px; height: 22px; flex: none; }
       </div>
       <p id="scenario" class="scenario"></p>
       <p id="scenario-en" class="dim" hidden></p>
+      <p id="rule" class="rule" hidden></p>
       <div class="row">
         <button id="btn-repeat">Réécouter</button>
         <button id="btn-slow">Lentement</button>
@@ -232,6 +249,8 @@ label.check input { width: 22px; height: 22px; flex: none; }
     <div class="panel">
       <h2>Ta réponse</h2>
       <p class="yours" id="your-answer"></p>
+      <h3>Critères</h3>
+      <ul id="my-criteria"></ul>
       <h3>Correction</h3>
       <p id="corrected" class="good"></p>
       <ul id="mistakes"></ul>
@@ -474,14 +493,53 @@ function botForms() {
   return BOTS.map((b, i) => `- ${b.name} (${b.persona}) This round: ${ideas[i]}; ${french[i]}.`).join("\n");
 }
 
-function promptRound(kind, recent) {
+// ---------- judging criteria ----------
+const CRITERIA = [
+  { key: "direct", fr: "Répond à la question", en: "Directly answers the query: it addresses the actual scenario." },
+  { key: "correct", fr: "Correct", en: "Correct / accurate: factually or logically correct." },
+  { key: "rule", fr: "Respecte la consigne", en: "Matches the requirements: follows the specific constraints in the prompt." },
+  { key: "clear", fr: "Clair", en: "Clear: easy to understand." },
+  { key: "specific", fr: "Précis", en: "Specific: gives a relevant, precise answer." },
+  { key: "concise", fr: "Simple", en: "Simple / concise: avoids unnecessary words." },
+  { key: "context", fr: "Adapté", en: "Contextually appropriate: fits the situation." },
+  { key: "creative", fr: "Créatif", en: "Creative / original: adds inventiveness when the prompt calls for it." },
+  { key: "plausible", fr: "Réaliste", en: "Plausible / realistic: makes sense in the real world or within the scenario." },
+  { key: "justified", fr: "Justifié", en: "Well-justified: gives a useful reason or explanation when appropriate." },
+  { key: "vivid", fr: "Vivant", en: "Vivid / sensory: uses expressive details that fit the prompt." },
+  { key: "safe", fr: "Approprié", en: "Safe / appropriate: suits the context." },
+];
+const critOf = (k) => CRITERIA.find((c) => c.key === k);
+$("criteria-list").replaceChildren(...CRITERIA.map((c) => { const li = el("li"); li.append(el("b", null, c.fr), ` · ${c.en}`); return li; }));
+// Rules make "Respecte la consigne" testable. About half the rounds get one.
+const RULES = [
+  { fr: "Réponds en une seule phrase.", en: "Answer in one sentence." },
+  { fr: "Utilise « parce que » pour expliquer.", en: "Use « parce que » to explain why." },
+  { fr: "Utilise le futur proche (aller + infinitif).", en: "Use the near future (aller + infinitive)." },
+  { fr: "Utilise « d'abord » et « ensuite ».", en: "Use « d'abord » and « ensuite »." },
+  { fr: "Pose une question dans ta réponse.", en: "Ask a question in your answer." },
+  { fr: "Maximum 15 mots.", en: "15 words maximum." },
+  { fr: "Utilise une couleur, un son ou une odeur.", en: "Mention a colour, a sound or a smell." },
+  { fr: "Parle poliment avec « vous ».", en: "Speak politely, using « vous »." },
+  { fr: "N'utilise pas le mot « non ».", en: "Don't use the word « non »." },
+  { fr: "Utilise le passé composé.", en: "Use the passé composé." },
+  { fr: "Donne deux solutions.", en: "Give two solutions." },
+];
+const pickRule = () => (Math.random() < 0.5 ? RULES[Math.floor(Math.random() * RULES.length)] : null);
+const WEIGHTS = {
+  absurd: "This is an absurd round: weight Creative, Vivid and Directly answers the most. Plausible means it works within the scenario's own logic.",
+  workAbsurd: "This is an absurd office round: weight Creative, Vivid and Directly answers the most. Plausible means it works within the scenario's own logic.",
+  real: "This is a real-life round: weight Directly answers, Plausible, Specific and Contextually appropriate the most. Creativity is a bonus, not required.",
+  work: "This is a practical work round: weight Directly answers, Plausible, Specific, Contextually appropriate (professional tone) and Well-justified the most. Creativity is a bonus, not required.",
+};
+
+function promptRound(kind, recent, rule) {
   const what = `${KINDS[kind].style}\nBuild it on this idea, inventing concrete details: ${pickSeed(kind)}.`;
   return `You are the game master of a French speaking game for a learner. Write all French for this level: ${levelLine()}
 
 Create ${what}
-The scenario is 1-2 short French sentences, uses "tu", and ends with a question.
+The scenario is 1-2 short French sentences, uses "tu", and ends with a question.${rule ? `\nEvery player must follow this rule: "${rule.fr}". Do not write the rule into the scenario; it is shown separately.` : ""}
 Do not repeat these recent scenarios: ${recent.join(" | ") || "none"}.
-Then write each bot player's answer: 1-2 French sentences at the same level, in character, following the form given for this round exactly (mistakes must be real, natural learner mistakes):
+Then write each bot player's answer: 1-2 French sentences at the same level, in character, following the form given for this round exactly (mistakes must be real, natural learner mistakes)${rule ? "; a bot with a weak idea may break the rule, the others follow it" : ""}:
 ${botForms()}
 
 Reply with only JSON in this shape:
@@ -490,23 +548,30 @@ Give 3 useful_words the player might need to answer.`;
 }
 
 // The judge sees anonymous, shuffled labels so it can't favour a name.
-function promptJudge(scenario, answer, botAnswers, labels) {
+function promptJudge(scenario, answer, botAnswers, labels, kind, rule) {
   const all = shuffle([{ player: YOU, answer }, ...botAnswers.map((b) => ({ player: b.bot, answer: b.answer }))])
     .map((a, i) => { const l = `Joueur ${"ABCD"[i]}`; labels[l] = a.player; return { player: l, answer: a.answer }; });
   const human = Object.keys(labels).find((l) => labels[l] === YOU);
   return `You are "Le Juge", a dramatic, funny, kind game-show judge (a sentient drum, like the Roblox game AI Judge) in a French speaking game for a learner. Write your French at this level: ${levelLine()}
 
-Score every player: idea 0-5 (creative, smart or funny, and it solves the problem) and french 0-5 (grammar, vocabulary, natural phrasing; 5 = correct and natural for the level).
-Score each answer on its own merits. Style and long words do not earn points by themselves: an idea scores high only if it actually solves the problem, and a short correct answer can beat a long, fancy one. Do not favour any player.
+Score every player on two things.
+1. idea 0-5 = content, judged on these criteria (key: meaning):
+${CRITERIA.map((c) => `- ${c.key}: ${c.en}`).join("\n")}
+${WEIGHTS[kind] || ""}
+${rule ? `Rule for this round: "${rule.fr}" (${rule.en}). An answer that breaks it loses at least 1 content point and gets "rule" in missing.` : `There is no special rule this round; treat "rule" as met when the answer does what the scenario asks.`}
+An answer that ignores the scenario scores 0-1. An unsafe or inappropriate answer scores at most 1.
+2. french 0-5 = grammar, vocabulary and natural phrasing (5 = correct and natural for the level).
+Score each answer on its own merits. Style and long words earn nothing by themselves, and a short, correct, direct answer can beat a long, fancy one. Do not favour any player.
+For each answer list its strongest criteria in "good" (2-3 keys) and the ones it misses most in "missing" (0-2 keys), using only the keys above.
 The human learner is ${human}.
 The human may have dictated with the phone keyboard, so ignore missing punctuation, capitals and obvious dictation glitches.
 If the human answer is empty or not in French, give french 0 and say so kindly.
 
-Scenario: ${scenario}
+Scenario: ${scenario}${rule ? `\nRule: ${rule.fr}` : ""}
 Answers: ${JSON.stringify(all)}
 
 Reply with only JSON in this shape:
-{"results": [{"player": "Joueur A", "idea": 0, "french": 0, "comment_fr": "short funny comment, max 15 words, without naming the player"}, …one per player in the same order],
+{"results": [{"player": "Joueur A", "idea": 0, "french": 0, "good": ["direct", "clear"], "missing": ["justified"], "comment_fr": "short funny comment, max 15 words, without naming the player"}, …one per player in the same order],
  "winner": "the label with the best total",
  "verdict_fr": "what the judge announces out loud, 2 short dramatic sentences, naming the winner by their label",
  "feedback": {"corrected": "the human's answer rewritten in correct French, same idea (repeat it if already perfect)",
@@ -615,28 +680,34 @@ async function startRound() {
   $("round-kind").textContent = KINDS[kind].label;
   $("scenario").replaceChildren(el("span", "thinking", "Le Juge prépare la question"));
   $("scenario-en").hidden = true;
+  $("rule").hidden = true;
   $("useful-words").replaceChildren();
+  const rule = pickRule();
   $("answer").value = ""; $("answer").disabled = true; $("btn-submit").disabled = true;
   setBar(1); renderPlayers({});
 
   let r;
   try {
-    r = await ask(promptRound(kind, recent()), "quick");
+    r = await ask(promptRound(kind, recent(), rule), "quick");
     if (!r?.scenario_fr || !Array.isArray(r.bot_answers)) throw { code: "invalid_json" };
   } catch (e) {
     toast(errText(e)); game.n--; show(game.n ? "results" : "lobby");
     if (!game.n) game = null, renderScorebar();
     return;
   }
-  round = { ...r, kind, bot_answers: r.bot_answers.filter((b) => botOf(b.bot)) };
+  round = { ...r, kind, rule, bot_answers: r.bot_answers.filter((b) => botOf(b.bot)) };
   remember(round.scenario_fr);
   $("scenario").textContent = round.scenario_fr;
   $("scenario-en").textContent = round.scenario_en || "";
   $("scenario-en").hidden = !settings.autoEn;
+  if (rule) {
+    $("rule").replaceChildren(el("b", null, "Consigne : "), rule.fr, el("span", "dim", ` (${rule.en})`));
+    $("rule").hidden = false;
+  }
   $("useful-words").replaceChildren(...(round.useful_words || []).map((w) => { const s = el("span"); s.append(el("b", null, w.fr), ` ${w.en}`); return s; }));
   $("answer").disabled = false; $("btn-submit").disabled = false;
   const mine = round;
-  await judgeSays(round.scenario_fr);
+  await judgeSays(rule ? `${round.scenario_fr} Consigne : ${rule.fr}` : round.scenario_fr);
   if (round === mine && !round.submitted) startTimer();
 }
 
@@ -676,7 +747,7 @@ async function submit(timeUp) {
   let res;
   try {
     const labels = {};
-    res = await ask(promptJudge(round.scenario_fr, answer || "(pas de réponse)", round.bot_answers, labels), settings.tier);
+    res = await ask(promptJudge(round.scenario_fr, answer || "(pas de réponse)", round.bot_answers, labels, round.kind, round.rule), settings.tier);
     if (!Array.isArray(res?.results) || !res.feedback) throw { code: "invalid_json" };
     unmask(res, labels);
   } catch (e) {
@@ -702,6 +773,13 @@ function unmask(res, labels) {
     return name === YOU ? "toi" : name || m;
   });
 }
+const keys = (a) => (Array.isArray(a) ? a : []).filter((k) => critOf(k));
+function critChips(r) {
+  const box = el("div", "crit");
+  for (const k of keys(r.good)) box.append(el("span", "ok", `✓ ${critOf(k).fr}`));
+  for (const k of keys(r.missing)) box.append(el("span", "ko", `✗ ${critOf(k).fr}`));
+  return box;
+}
 const pts = (r) => (Number(r.idea) || 0) + (Number(r.french) || 0);
 function showResults(answer, res) {
   show("results");
@@ -716,11 +794,16 @@ function showResults(answer, res) {
     const who = el("div", "who"); who.append(avatar(r.player), r.player);
     if (r.player === res.winner) who.append(el("span", "crown", "Gagnant"));
     who.append(el("span", "pts", `${pts(r)}/10`));
-    d.append(who, el("p", null, answers[r.player] || ""), el("p", "com", `Idée ${r.idea}/5 · Français ${r.french}/5. ${r.comment_fr || ""}`));
+    d.append(who, el("p", null, answers[r.player] || ""), el("p", "com", `Contenu ${r.idea}/5 · Français ${r.french}/5. ${r.comment_fr || ""}`), critChips(r));
     return d;
   }));
   const f = res.feedback;
   $("your-answer").textContent = answers[YOU];
+  const me = results.find((r) => r.player === YOU);
+  $("my-criteria").replaceChildren(...[
+    ...keys(me?.good).map((k) => { const li = el("li"); li.append(el("b", "good-k", `✓ ${critOf(k).fr}`), ` · ${critOf(k).en}`); return li; }),
+    ...keys(me?.missing).map((k) => { const li = el("li"); li.append(el("b", "miss-k", `✗ ${critOf(k).fr}`), ` · ${critOf(k).en}`); return li; }),
+  ]);
   $("corrected").textContent = f.corrected || "";
   const mistakes = Array.isArray(f.mistakes) ? f.mistakes : [];
   $("mistakes").replaceChildren(...mistakes.map((m) => { const li = el("li"); li.append(el("s", null, m.wrong), " → ", el("b", null, m.right), ` (${m.why_en})`); return li; }));
