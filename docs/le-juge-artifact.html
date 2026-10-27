@@ -511,19 +511,41 @@ const CRITERIA = [
 const critOf = (k) => CRITERIA.find((c) => c.key === k);
 $("criteria-list").replaceChildren(...CRITERIA.map((c) => { const li = el("li"); li.append(el("b", null, c.fr), ` · ${c.en}`); return li; }));
 // Rules make "Respecte la consigne" testable. About half the rounds get one.
+// Words of an answer, lowercased; "j'ai" also yields "j'" and "ai".
+function tokens(text) {
+  const t = String(text).toLowerCase().replace(/[’`]/g, "'").split(/[^\p{L}\p{N}'-]+/u).filter(Boolean);
+  return t.flatMap((w) => (w.includes("'") ? [w, ...w.split("'").filter(Boolean)] : [w]));
+}
+const phrase = (text) => ` ${String(text).toLowerCase().replace(/[’`]/g, "'").split(/[^\p{L}\p{N}']+/u).filter(Boolean).join(" ")} `;
+const hasAny = (text, re) => tokens(text).some((w) => re.test(w));
+const COLOUR = /^(rouges?|bleue?s?|verte?s?|jaunes?|noire?s?|blanc(he)?s?|grise?s?|roses?|violette?s?|oranges?|marron|brune?s?|dorée?s?|argentée?s?|beiges?|turquoises?|couleurs?|multicolore?s?|clair(e)?s?|foncée?s?)$/;
+const SOUND = /^(bruits?|sons?|musiques?|chant\w*|cri\w*|sonn\w*|entend\w*|écout\w*|silence|boum|bip|siffl\w*|klaxon\w*|bruyante?s?|fort)$/;
+const SMELL = /^(odeurs?|sent|sens|sentent|sentir|senti|parfum\w*|pue\w*|arômes?|goûts?|délicieu\w*)$/;
 const RULES = [
-  { fr: "Réponds en une seule phrase.", en: "Answer in one sentence." },
-  { fr: "Utilise « parce que » pour expliquer.", en: "Use « parce que » to explain why." },
-  { fr: "Utilise le futur proche (aller + infinitif).", en: "Use the near future (aller + infinitive)." },
-  { fr: "Utilise « d'abord » et « ensuite ».", en: "Use « d'abord » and « ensuite »." },
-  { fr: "Pose une question dans ta réponse.", en: "Ask a question in your answer." },
-  { fr: "Maximum 15 mots.", en: "15 words maximum." },
-  { fr: "Utilise une couleur, un son ou une odeur.", en: "Mention a colour, a sound or a smell." },
-  { fr: "Parle poliment avec « vous ».", en: "Speak politely, using « vous »." },
-  { fr: "N'utilise pas le mot « non ».", en: "Don't use the word « non »." },
-  { fr: "Utilise le passé composé.", en: "Use the passé composé." },
-  { fr: "Donne deux solutions.", en: "Give two solutions." },
+  { fr: "Réponds en une seule phrase.", en: "Answer in one sentence.",
+    check: (a) => a.split(/[.!?…]+/).filter((x) => x.trim()).length <= 1 },
+  { fr: "Utilise « parce que » pour expliquer.", en: "Use « parce que » to explain why.",
+    check: (a) => phrase(a).includes(" parce que ") || phrase(a).includes(" parce qu'") },
+  { fr: "Utilise le futur proche (aller + infinitif).", en: "Use the near future (aller + infinitive).",
+    check: (a) => /\b(vais|vas|va|allons|allez|vont)\s+(\S+\s+){0,2}\S+(er|ir|re|oir)\b/.test(phrase(a)) || null },
+  { fr: "Utilise « d'abord » et « ensuite ».", en: "Use « d'abord » and « ensuite ».",
+    check: (a) => phrase(a).includes(" d'abord ") && phrase(a).includes(" ensuite ") },
+  { fr: "Pose une question dans ta réponse.", en: "Ask a question in your answer.",
+    check: (a) => a.includes("?") || /-(vous|tu|ils?|elles?|on)\b/i.test(a) || /( est-ce | pourquoi | comment | où | quand | combien | quel| quelle| qui )/.test(phrase(a)) || null },
+  { fr: "Maximum 15 mots.", en: "15 words maximum.",
+    check: (a) => a.trim().split(/\s+/).filter(Boolean).length <= 15 },
+  { fr: "Utilise une couleur, un son ou une odeur.", en: "Mention a colour, a sound or a smell.",
+    check: (a) => hasAny(a, COLOUR) || hasAny(a, SOUND) || hasAny(a, SMELL) || null },
+  { fr: "Parle poliment avec « vous ».", en: "Speak politely, using « vous ».",
+    check: (a) => tokens(a).includes("vous") },
+  { fr: "N'utilise pas le mot « non ».", en: "Don't use the word « non ».",
+    check: (a) => !tokens(a).includes("non") },
+  { fr: "Utilise le passé composé.", en: "Use the passé composé.",
+    check: (a) => /( ai | as | a | avons | avez | ont | suis | es | est | sommes | êtes | sont )(\S+ ){0,2}\S+(é|ée|és|ées|i|is|it|u|ue|us|ert|erte|ort|ait|aite|eint)\s/.test(phrase(a).replace(/ j'ai /g, " j' ai ")) || null },
+  { fr: "Donne deux solutions.", en: "Give two solutions.", check: () => null },
 ];
+// What the code can say about the rule for one answer: true met, false broken, null unknown.
+const ruleCheck = (rule, answer) => (rule && answer && answer !== "(pas de réponse)" ? rule.check(answer) : null);
 const pickRule = () => (Math.random() < 0.5 ? RULES[Math.floor(Math.random() * RULES.length)] : null);
 const WEIGHTS = {
   absurd: "This is an absurd round: weight Creative, Vivid and Directly answers the most. Plausible means it works within the scenario's own logic.",
@@ -552,16 +574,25 @@ function promptJudge(scenario, answer, botAnswers, labels, kind, rule) {
   const all = shuffle([{ player: YOU, answer }, ...botAnswers.map((b) => ({ player: b.bot, answer: b.answer }))])
     .map((a, i) => { const l = `Joueur ${"ABCD"[i]}`; labels[l] = a.player; return { player: l, answer: a.answer }; });
   const human = Object.keys(labels).find((l) => labels[l] === YOU);
+  const facts = rule ? all.map((a) => {
+    const c = ruleCheck(rule, a.answer);
+    return c === null ? null : `${a.player}: ${c ? "MET" : "BROKEN"}`;
+  }).filter(Boolean) : [];
   return `You are "Le Juge", a dramatic, funny, kind game-show judge (a sentient drum, like the Roblox game AI Judge) in a French speaking game for a learner. Write your French at this level: ${levelLine()}
 
 Score every player on two things.
 1. idea 0-5 = content, judged on these criteria (key: meaning):
 ${CRITERIA.map((c) => `- ${c.key}: ${c.en}`).join("\n")}
 ${WEIGHTS[kind] || ""}
-${rule ? `Rule for this round: "${rule.fr}" (${rule.en}). An answer that breaks it loses at least 1 content point and gets "rule" in missing.` : `There is no special rule this round; treat "rule" as met when the answer does what the scenario asks.`}
+${rule ? `Rule for this round: "${rule.fr}" (${rule.en}). An answer that breaks it loses 1 content point and gets "rule" in missing. Read the rule generously: any form of a word counts (noir, noire, noirs, noires are all colours).${facts.length ? `\nThe game already checked the rule with exact word matching. These results are facts; do not contradict them: ${facts.join("; ")}.` : ""}` : `There is no special rule this round; treat "rule" as met when the answer does what the scenario asks.`}
 An answer that ignores the scenario scores 0-1. An unsafe or inappropriate answer scores at most 1.
 2. french 0-5 = grammar, vocabulary and natural phrasing (5 = correct and natural for the level).
 Score each answer on its own merits. Style and long words earn nothing by themselves, and a short, correct, direct answer can beat a long, fancy one. Do not favour any player.
+Players are ${settings.level} learners, so reward functional communication:
+- Accept any word or phrase a French speaker would understand as a valid solution. Synonyms, near-synonyms, simpler words and general terms count fully ("objets trouvés" is as good as "bureau des bagages"; "d'autres bonnes choses" is fine). Never take points off because the answer didn't use the word you expected. You may suggest the more usual word in better_version or tip_en, without a penalty.
+- An answer that directly answers the scenario, is understandable, and makes sense earns at least 3 content points.
+- "vivid", "creative" and "justified" are bonuses that lift a good answer to 4-5. Their absence never costs points, and never list them in "missing".
+- "specific" is missing only when the answer is so vague it doesn't say what the player would do. General words are not a problem.
 For each answer list its strongest criteria in "good" (2-3 keys) and the ones it misses most in "missing" (0-2 keys), using only the keys above.
 The human learner is ${human}.
 The human may have dictated with the phone keyboard, so ignore missing punctuation, capitals and obvious dictation glitches.
@@ -750,6 +781,7 @@ async function submit(timeUp) {
     res = await ask(promptJudge(round.scenario_fr, answer || "(pas de réponse)", round.bot_answers, labels, round.kind, round.rule), settings.tier);
     if (!Array.isArray(res?.results) || !res.feedback) throw { code: "invalid_json" };
     unmask(res, labels);
+    enforce(res, answer || "(pas de réponse)", round);
   } catch (e) {
     toast(errText(e));
     round.submitted = false;
@@ -761,6 +793,29 @@ async function submit(timeUp) {
 }
 
 // Turn "Joueur B" back into real names, in table order, and make sure the winner has the top score.
+// The code's rule check overrides the judge, and bonus criteria never count as missing.
+const BONUS = new Set(["vivid", "creative", "justified"]);
+function enforce(res, answer, round) {
+  const answers = { [YOU]: answer, ...Object.fromEntries(round.bot_answers.map((b) => [b.bot, b.answer])) };
+  for (const r of res.results) {
+    r.idea = Math.max(0, Math.min(5, Number(r.idea) || 0));
+    r.french = Math.max(0, Math.min(5, Number(r.french) || 0));
+    r.missing = keys(r.missing).filter((k) => !BONUS.has(k));
+    r.good = keys(r.good);
+    const c = ruleCheck(round.rule, answers[r.player]);
+    if (c === true && r.missing.includes("rule")) {
+      r.missing = r.missing.filter((k) => k !== "rule");
+      r.idea = Math.min(5, r.idea + 1); // give back the point the judge took for a rule that was met
+    }
+    if (c === true && round.rule && !r.good.includes("rule")) r.good = [...r.good.slice(0, 2), "rule"];
+    if (c === false) {
+      r.good = r.good.filter((k) => k !== "rule");
+      if (!r.missing.includes("rule")) r.missing = ["rule", ...r.missing].slice(0, 2);
+    }
+  }
+  const top = Math.max(...res.results.map(pts));
+  if (!res.results.some((r) => r.player === res.winner && pts(r) === top)) res.winner = res.results.find((r) => pts(r) === top)?.player;
+}
 function unmask(res, labels) {
   const byLabel = (l) => labels[String(l).replace(/^.*?(Joueur [ABCD]).*$/i, (m, x) => x.replace(/^j/, "J"))];
   for (const r of res.results) r.player = byLabel(r.player) || r.player;
